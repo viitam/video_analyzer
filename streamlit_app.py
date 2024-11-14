@@ -1,5 +1,6 @@
 import streamlit as st
 import boto3
+from datetime import datetime
 
 def upload_file(file, s3_key, s3_bucket_name):
     try:
@@ -14,13 +15,13 @@ def upload_file(file, s3_key, s3_bucket_name):
 def main():
     st.title("動画アップロード")
     st.write("アップロードした動画はAmazon S3に保存されます")
-
+    hashid = datetime.now().strftime('%Y%m%d%H%M%S')
     # ファイルアップロードのUI
     uploaded_file = st.file_uploader("動画ファイルを選択してください", type=["mp4", "mov", "avi"])
 
     if uploaded_file is not None:
         # S3にアップロードするためのファイルパス設定
-        file_name = "video/" + uploaded_file.name
+        file_name = hashid + uploaded_file.name
 
         # アップロードボタン
         if st.button("アップロード"):
