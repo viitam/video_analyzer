@@ -1,3 +1,4 @@
 streamlit
 openai
 boto3
+moviepy
