@@ -14,14 +14,30 @@ def upload_file(file, s3_key, s3_bucket_name):
     except Exception as e:
         st.error(f"エラー: {e}")
 
-def get_json_from_s3(bucket_name, key):
+def get_data_from_s3(bucket_name, key, data_type):
+    """
+    S3からデータを取得し、ファイルタイプに応じてデータを返す関数。
+
+    Parameters:
+    - bucket_name (str): S3バケット名
+    - key (str): S3のオブジェクトキー
+    - data_type (str): 取得するデータのタイプ ("json", "audio", "image")
+
+    Returns:
+    - データの内容に応じたデータオブジェクト
+    """
     s3 = boto3.client('s3')
     try:
         response = s3.get_object(Bucket=bucket_name, Key=key)
-        json_data = json.loads(response['Body'].read().decode('utf-8'))
-        return json_data
+        if data_type == "json":
+            return json.loads(response['Body'].read().decode('utf-8'))
+        elif data_type in ["audio", "image"]:
+            return response['Body'].read()  # バイナリデータを返す
+        else:
+            st.error("不正なデータタイプが指定されました")
+            return None
     except Exception as e:
-        st.error(f"エラー: {e}")
+        st.error(f"{data_type}ファイルの取得中にエラーが発生しました: {e}")
         return None
 
 def main():
@@ -30,6 +46,8 @@ def main():
 
     s3_bucket_name_out = "tq-lambda-result"
     st.session_state.s3_bucket_name_out = s3_bucket_name_out
+    audio_bucket_name = "tq-tmp-audio"  # 音声ファイルのS3バケット
+    photo_bucket_name = "tq-tmp-photo"  # 画像ファイルのS3バケット
 
     uploaded_file = st.file_uploader("動画ファイルを選択してください", type=["mp4", "mov", "avi"])
 
@@ -80,16 +98,24 @@ def main():
         for i in range(1, json_file_count + 1):
             key = f"{st.session_state.hashid}{st.session_state.basename}/{st.session_state.hashid}{st.session_state.basename}_audio_{i:05}.json"
             st.write(f"{(i-1)*30} ~{i*30}sec までの音声文字起こし")
-            json_data = get_json_from_s3(s3_bucket_name_out, key)
+            json_data = get_data_from_s3(s3_bucket_name_out, key, "json")
             if json_data:
+                audio_key = f"{st.session_state.hashid}{st.session_state.basename}/{st.session_state.hashid}{st.session_state.basename}_audio_{i:05}.mp4"  # 音声ファイルのキー
+                audio_data = get_data_from_s3(audio_bucket_name, audio_key, "audio")
+                st.write(audio_key)
+                st.audio(audio_data)  # 音声ファイルを埋め込み
                 st.json(json_data)
         
         for i in range(0, json_file_count2):
             key = f"{st.session_state.hashid}{st.session_state.basename}/{st.session_state.hashid}{st.session_state.basename}_photo_{i:07}.json"
             st.write(f"{i*5}sec の写真")
-            json_data = get_json_from_s3(s3_bucket_name_out, key)
+            json_data = get_data_from_s3(s3_bucket_name_out, key, "json")
             if json_data:
+                photo_key = f"{st.session_state.hashid}{st.session_state.basename}/{st.session_state.hashid}{st.session_state.basename}_photo_{i:07}.jpg"  # 画像ファイルのキー
+                photo_data = get_data_from_s3(photo_bucket_name, photo_key, "image")
+                st.image(photo_data)
                 st.json(json_data)
+
 
 if __name__ == "__main__":
     main()
